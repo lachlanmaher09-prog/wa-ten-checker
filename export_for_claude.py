@@ -142,9 +142,6 @@ def export_polygons(conn, lat, lon, radius_km, scope_label, types=None):
             if prefix not in types:
                 continue
         if not geom_json:
-            # This tenement was captured before geometry_json existed (an
-            # older snapshot from before this fix) - it'll have a real
-            # boundary again after the next update.py run.
             skipped_no_geometry += 1
             continue
         features.append({
@@ -173,14 +170,13 @@ def export_polygons(conn, lat, lon, radius_km, scope_label, types=None):
 
 
 def main():
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     args = sys.argv[1:]
     lat, lon, radius_km = None, None, None
     scope_label = "statewide"
     all_types = "--all-types" in args
     args = [a for a in args if a != "--all-types"]
 
-    # Default polygon type set: Exploration, Mining, Prospecting - the
-    # three that actually matter for access gates and prospectivity signal.
     poly_types = {"E", "M", "P"}
     for a in list(args):
         if a.startswith("--types="):
@@ -196,7 +192,6 @@ def main():
     elif len(args) == 1:
         print("Usage: python export_for_claude.py [lat lon [radius_km]] [--all-types] [--types=E,M,P]")
         print("       (no arguments = statewide export)")
-        print("       (default polygon types: E, M, P - override with --types=... or use --all-types for everything)")
         sys.exit(1)
 
     if not DB_PATH.exists():
@@ -218,10 +213,7 @@ def main():
 
     types_filter = None if all_types else poly_types
     if lat is None and all_types:
-        print("\nWARNING: statewide + --all-types can be a genuinely large file "
-              "(tens of MB, ~30,000 tenement boundaries). Proceeding anyway, "
-              "but if this fails or is too slow to upload, re-run without "
-              "--all-types for the smaller E/M/P-only version.")
+        print("\nWARNING: statewide + --all-types can be a genuinely large file.")
 
     poly_path, poly_n = export_polygons(conn, lat, lon, radius_km, scope_label, types=types_filter)
     label = "all tenement types" if all_types else "/".join(sorted(poly_types))
