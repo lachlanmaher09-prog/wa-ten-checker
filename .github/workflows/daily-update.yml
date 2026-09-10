@@ -1,0 +1,63 @@
+name: Daily Tenement Update
+
+# Runs automatically every day, entirely in the cloud - your phone or PC
+# don't need to be on at all. Also runnable manually from the Actions tab
+# if you want to force a refresh.
+on:
+  schedule:
+    - cron: "0 22 * * *"   # ~6am WA time (WA is UTC+8, no daylight saving)
+  workflow_dispatch: {}     # adds a manual "Run workflow" button on GitHub
+
+permissions:
+  contents: write   # needed so the workflow can commit updated files back
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write config.json from secrets
+        run: |
+          cat > config.json << 'EOF'
+          {
+            "slip_username": "${{ secrets.SLIP_USERNAME }}",
+            "slip_password": "${{ secrets.SLIP_PASSWORD }}",
+            "direct_download_url": "${{ secrets.SLIP_DIRECT_DOWNLOAD_URL }}",
+            "default_export_radius_km": 25
+          }
+          EOF
+
+      - name: Initialise / migrate database
+        run: python init_db.py
+
+      - name: Pull latest tenement data
+        run: python update.py
+
+      - name: Export statewide CSVs + E/M/P polygons
+        run: python export_for_claude.py
+
+      - name: Publish fixed-name 'latest' files for phone bookmarking
+        run: |
+          mkdir -p latest
+          cp output/current_tenements_statewide_*.csv latest/current_tenements_statewide.csv
+          cp output/change_history_statewide_*.csv latest/change_history_statewide.csv
+          cp output/tenement_boundaries_emp_statewide_*.geojson latest/tenement_boundaries_emp_statewide.geojson
+          echo "Last updated (UTC): $(date -u '+%Y-%m-%d %H:%M')" > latest/last_updated.txt
+
+      - name: Commit database and latest files back to the repo
+        run: |
+          git config user.name "Tenement Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add menzies.db latest/
+          git diff --quiet --cached || git commit -m "Automated update $(date -u '+%Y-%m-%d')"
+          git push
