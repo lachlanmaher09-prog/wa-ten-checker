@@ -27,15 +27,22 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Write config.json from secrets
+        env:
+          SLIP_USERNAME: ${{ secrets.SLIP_USERNAME }}
+          SLIP_PASSWORD: ${{ secrets.SLIP_PASSWORD }}
+          SLIP_DIRECT_DOWNLOAD_URL: ${{ secrets.SLIP_DIRECT_DOWNLOAD_URL }}
         run: |
-          cat > config.json << 'EOF'
-          {
-            "slip_username": "${{ secrets.SLIP_USERNAME }}",
-            "slip_password": "${{ secrets.SLIP_PASSWORD }}",
-            "direct_download_url": "${{ secrets.SLIP_DIRECT_DOWNLOAD_URL }}",
-            "default_export_radius_km": 25
+          python3 -c "
+          import json, os
+          config = {
+              'slip_username': os.environ['SLIP_USERNAME'].strip(),
+              'slip_password': os.environ['SLIP_PASSWORD'].strip(),
+              'direct_download_url': os.environ['SLIP_DIRECT_DOWNLOAD_URL'].strip(),
+              'default_export_radius_km': 25
           }
-          EOF
+          with open('config.json', 'w') as f:
+              json.dump(config, f)
+          "
 
       - name: Initialise / migrate database
         run: python init_db.py
