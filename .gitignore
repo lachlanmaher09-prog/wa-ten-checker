@@ -1,0 +1,13 @@
+# CRITICAL: never let your real config.json with real SLIP credentials
+# reach this repo - it's public. The GitHub Actions workflow generates its
+# own config.json fresh from repository secrets on every run and never
+# commits it back, so this file only ever needs to exist locally on your
+# PC, never here.
+config.json
+
+# Local-only working files - the workflow regenerates these fresh each run
+output/*.csv
+output/*.geojson
+data/
+__pycache__/
+*.pyc
